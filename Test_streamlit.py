@@ -1,39 +1,37 @@
 import streamlit as st
+from groq import Groq  # Official Groq client (no proxies)
 import os
-from datetime import datetime
 
 # ======================
-# 1. GROQ INITIALIZATION (CLEANED)
+# 1. MINIMAL GROQ SETUP
 # ======================
-try:
-    from groq import Groq
-    client = Groq(api_key=st.secrets["GROQ_API_KEY"])  # Minimal initialization
-except ImportError:
-    st.error("Missing 'groq' package. Add to requirements.txt: groq==0.4")
+if "GROQ_API_KEY" not in st.secrets:
+    st.error("Missing GROQ_API_KEY in secrets")
     st.stop()
+
+try:
+    # Pure initialization without any proxy parameters
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
     st.error(f"Connection failed: {str(e)}")
     st.stop()
 
 # ======================
-# 2. STREAMLIT CHAT INTERFACE
+# 2. STREAMLIT CHAT UI
 # ======================
-st.title("🚀 Groq-Powered Chatbot")
+st.title("🚀 Groq Chatbot")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat history
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-# Chat input
 if prompt := st.chat_input("Ask anything"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.spinner("Thinking..."):
         try:
-            # Clean API call without proxies
             response = client.chat.completions.create(
                 model="llama3-70b-8192",
                 messages=[{"role": "user", "content": prompt}],
@@ -42,6 +40,6 @@ if prompt := st.chat_input("Ask anything"):
             reply = response.choices[0].message.content
         except Exception as e:
             reply = f"Error: {str(e)}"
-        
+    
     st.session_state.messages.append({"role": "assistant", "content": reply})
-    st.rerun()  # Refresh to show new messages
+    st.rerun()
