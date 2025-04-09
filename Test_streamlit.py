@@ -2,74 +2,83 @@ import streamlit as st
 import os
 import re
 import sys
+import subprocess
 from datetime import datetime
 
 # ======================
-# 1. PACKAGE VERIFICATION (BULLETPROOF)
+# 1. PACKAGE ENFORCEMENT (BULLETPROOF)
 # ======================
-def ensure_package(package):
-    """Guaranteed package installation with multiple fallbacks"""
+def enforce_package(package):
+    """Guaranteed package installation with all fallbacks"""
+    package_name = package.split('==')[0]
+    
+    # First try normal import
     try:
-        __import__(package.split('==')[0])
+        __import__(package_name)
+        return True
     except ImportError:
-        import subprocess
-        import pip
-        
-        # Try all installation methods
-        for method in [
-            lambda: pip.main(['install', package]),
-            lambda: subprocess.check_call([sys.executable, '-m', 'pip', 'install', package]),
-            lambda: subprocess.check_call(['pip', 'install', package])
-        ]:
-            try:
-                method()
-                __import__(package.split('==')[0])
-                st.rerun()
-                return
-            except:
-                continue
-        
-        st.error(f"""
-        ❌ Critical: Failed to install '{package}'
-        1. Add to requirements.txt:
-        ```
-        {package}
-        ```
-        2. Redeploy the app
-        """)
-        st.stop()
+        pass
+    
+    # Try all installation methods
+    installation_methods = [
+        [sys.executable, "-m", "pip", "install", package],
+        ["pip", "install", package],
+        ["pip3", "install", package]
+    ]
+    
+    for method in installation_methods:
+        try:
+            subprocess.check_call(method)
+            __import__(package_name)
+            st.success(f"✅ Successfully installed {package}")
+            st.rerun()
+            return True
+        except:
+            continue
+    
+    # If all methods fail
+    st.error(f"""
+    ❌ CRITICAL: Failed to install '{package}'
+    
+    REQUIRED ACTION:
+    1. Create file 'requirements.txt' in your repository root with:
+    ```
+    {package}
+    ```
+    2. Push to GitHub
+    3. Delete and redeploy your Streamlit app
+    """)
+    st.stop()
 
-ensure_package("groq==0.3")
+enforce_package("groq==0.3")
 from groq import Groq
 
 # ======================
-# 2. GROQ SETUP (UNCHANGED)
+# 2. GROQ SETUP
 # ======================
-if not os.environ.get("GROQ_API_KEY") and "GROQ_API_KEY" not in st.secrets:
+if "GROQ_API_KEY" not in st.secrets:
     st.error("""
-    🔑 Missing API Key!
+    🔑 MISSING API KEY!
     1. Get key from console.groq.com
     2. Add to Streamlit secrets as GROQ_API_KEY
     """)
     st.stop()
 
 try:
-    client = Groq(api_key=os.environ.get("GROQ_API_KEY") or st.secrets["GROQ_API_KEY"])
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
-    st.error(f"🔌 Connection Failed: {str(e)}")
+    st.error(f"🔌 CONNECTION FAILED: {str(e)}")
     st.stop()
 
 # ======================
-# 3. CHAT FUNCTIONS (ENHANCED)
+# 3. CHAT FUNCTIONS
 # ======================
 def clean_response(text):
-    """More robust response cleaning"""
+    """Remove unwanted tags/formatting"""
     patterns = [
         r'<think>.*?</think>',
         r'As an? AI.*?',
-        r'\[.*?\]',
-        r'\(.*?\)',
-        r'Note:.*'
+        r'\[.*?\]'
     ]
     for pattern in patterns:
         text = re.sub(pattern, '', text, flags=re.DOTALL)
@@ -91,7 +100,7 @@ def generate_response(prompt):
         return f"⚠️ Error: {str(e)}"
 
 # ======================
-# 4. STREAMLIT UI (OPTIMIZED)
+# 4. STREAMLIT UI
 # ======================
 st.set_page_config(page_title="Groq Chatbot")
 st.title("🚀 Groq Chatbot")
