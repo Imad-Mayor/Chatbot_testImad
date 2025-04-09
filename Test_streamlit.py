@@ -1,75 +1,78 @@
 import streamlit as st
 import os
-import sys
-import subprocess
+import re
 
 # ======================
-# PACKAGE INSTALLATION CHECK
+# ENHANCED IMPORT WITH FALLBACK
 # ======================
-def install_package(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
 try:
-    import groq
+    from groq import Groq
+    groq_available = True
 except ImportError:
-    st.warning("Installing missing 'groq' package...")
-    install_package("groq==0.3")
-    import groq
+    groq_available = False
+    st.error("""
+    Critical: 'groq' package missing!
+    Add to requirements.txt:
+    ```
+    groq==0.3
+    ```
+    """)
+    st.stop()
 
 # ======================
-# GROQ INITIALIZATION
+# GROQ SETUP
 # ======================
-if "GROQ_API_KEY" not in st.secrets:
+if not os.environ.get("GROQ_API_KEY") and "GROQ_API_KEY" not in st.secrets:
     st.error("""
-    Missing Groq API Key!
-    1. Get key from https://console.groq.com/keys
+    Missing API Key!
+    1. Get key from console.groq.com
     2. Add to Streamlit secrets as GROQ_API_KEY
     """)
     st.stop()
 
 try:
-    client = groq.Client(api_key=st.secrets["GROQ_API_KEY"])
+    client = Groq(api_key=os.environ.get("GROQ_API_KEY") or st.secrets["GROQ_API_KEY"])
 except Exception as e:
-    st.error(f"Failed to initialize Groq client: {str(e)}")
+    st.error(f"API Connection Failed: {str(e)}")
     st.stop()
 
 # ======================
 # CHAT FUNCTIONS
 # ======================
+def clean_response(text):
+    return re.sub(r'<think>.*?</think>|Hi! I\'m DeepSeek-R1.*?documentation\.', '', text, flags=re.DOTALL).strip()
+
 def generate_response(prompt):
     try:
-        response = client.chat.completions.create(
+        chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "Respond directly without XML tags"},
                 {"role": "user", "content": prompt}
             ],
             model="llama3-70b-8192",
             temperature=0.7
         )
-        return response.choices[0].message.content
+        return clean_response(chat_completion.choices[0].message.content)
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"⚠️ Error: {str(e)}"
 
 # ======================
 # STREAMLIT UI
 # ======================
-st.title("💥 Guaranteed Working Groq Chatbot")
+st.title("💥 Groq Chatbot (Guaranteed Setup)")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    st.chat_message(message["role"]).write(message["content"])
 
-if prompt := st.chat_input("Ask me anything"):
+if prompt := st.chat_input("Ask anything"):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    st.chat_message("user").write(prompt)
     
-    with st.spinner("Thinking..."):
+    with st.spinner("Generating..."):
         response = generate_response(prompt)
     
-    with st.chat_message("assistant"):
-        st.markdown(response)
+    st.chat_message("assistant").write(response)
     st.session_state.messages.append({"role": "assistant", "content": response})
