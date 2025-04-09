@@ -16,7 +16,7 @@ except ImportError:
     1. Create file 'requirements.txt' in your repository root
     2. Add this line:
     ```
-    groq==0.3
+    groq==0.4
     ```
     3. Redeploy your app
     """)
