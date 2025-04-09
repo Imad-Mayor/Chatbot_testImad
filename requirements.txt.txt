@@ -1,0 +1,2 @@
+groq==0.3
+streamlit>=1.28
