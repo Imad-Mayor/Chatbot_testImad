@@ -1,64 +1,33 @@
 import streamlit as st
 import os
 import re
-import sys
-import subprocess
 from datetime import datetime
 
 # ======================
-# 1. PACKAGE ENFORCEMENT (BULLETPROOF)
+# 1. PACKAGE HANDLING (SIMPLIFIED)
 # ======================
-def enforce_package(package):
-    """Guaranteed package installation with all fallbacks"""
-    package_name = package.split('==')[0]
+try:
+    from groq import Groq
+except ImportError:
+    st.error("""
+    ❌ Missing required 'groq' package
     
-    # First try normal import
-    try:
-        __import__(package_name)
-        return True
-    except ImportError:
-        pass
-    
-    # Try all installation methods
-    installation_methods = [
-        [sys.executable, "-m", "pip", "install", package],
-        ["pip", "install", package],
-        ["pip3", "install", package]
-    ]
-    
-    for method in installation_methods:
-        try:
-            subprocess.check_call(method)
-            __import__(package_name)
-            st.success(f"✅ Successfully installed {package}")
-            st.rerun()
-            return True
-        except:
-            continue
-    
-    # If all methods fail
-    st.error(f"""
-    ❌ CRITICAL: Failed to install '{package}'
-    
-    REQUIRED ACTION:
-    1. Create file 'requirements.txt' in your repository root with:
+    SOLUTION:
+    1. Create file 'requirements.txt' in your repository root
+    2. Add this line:
     ```
-    {package}
+    groq==0.3
     ```
-    2. Push to GitHub
-    3. Delete and redeploy your Streamlit app
+    3. Redeploy your app
     """)
     st.stop()
-
-enforce_package("groq==0.3")
-from groq import Groq
 
 # ======================
 # 2. GROQ SETUP
 # ======================
 if "GROQ_API_KEY" not in st.secrets:
     st.error("""
-    🔑 MISSING API KEY!
+    🔑 Missing API Key!
     1. Get key from console.groq.com
     2. Add to Streamlit secrets as GROQ_API_KEY
     """)
@@ -67,14 +36,14 @@ if "GROQ_API_KEY" not in st.secrets:
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
-    st.error(f"🔌 CONNECTION FAILED: {str(e)}")
+    st.error(f"🔌 Connection Failed: {str(e)}")
     st.stop()
 
 # ======================
 # 3. CHAT FUNCTIONS
 # ======================
 def clean_response(text):
-    """Remove unwanted tags/formatting"""
+    """Remove unwanted tags/signatures"""
     patterns = [
         r'<think>.*?</think>',
         r'As an? AI.*?',
@@ -93,7 +62,7 @@ def generate_response(prompt):
             ],
             model="llama3-70b-8192",
             temperature=0.7,
-            timeout=15
+            timeout=10
         )
         return clean_response(response.choices[0].message.content)
     except Exception as e:
